@@ -1,0 +1,131 @@
+{
+  "id": "OfisAsistan00Hat",
+  "name": "00-Hata-Yakalayici",
+  "description": "Tüm akışların ortak hata akışı: hatayı MongoDB 'loglar' koleksiyonuna yazar, Telegram'a kısa uyarı gönderir.",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "94a6da9e-ed52-4764-acba-97a7319e6937",
+      "name": "Hata Oluştuğunda",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/** Code düğümünde require gerektirmeyen UUID v4 */\nconst uuid = () =>\n  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n    const r = (Math.random() * 16) | 0;\n    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n  });\n\n/** Telegram HTML ve e-posta gövdesi için kaçış */\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nconst e = $input.first().json;\nconst ex = e.execution || {};\nconst tr = e.trigger || {};\nconst err = ex.error || tr.error || {};\nconst akis = (e.workflow && e.workflow.name) || 'bilinmeyen';\nconst dugum = ex.lastNodeExecuted || (err.node && err.node.name) || '';\nconst hata = String(err.message || err.description || 'Bilinmeyen hata').slice(0, 1000);\n\nconst satirlar = [\n  '⚠️ <b>Akış hatası</b>',\n  '<b>Akış:</b> ' + esc(akis),\n  dugum ? '<b>Düğüm:</b> ' + esc(dugum) : '',\n  '<b>Hata:</b> ' + esc(hata.slice(0, 300)),\n  ex.url ? '<a href=\"' + esc(ex.url) + '\">Yürütmeyi aç</a>' : '',\n];\n\nreturn [\n  {\n    json: {\n      kid: uuid(),\n      akis,\n      dugum,\n      hata,\n      yurutme_id: String(ex.id || ''),\n      yurutme_url: ex.url || '',\n      seviye: 'hata',\n      tarih: new Date().toISOString(),\n      tg_metin: satirlar.filter(Boolean).join('\\n'),\n    },\n  },\n];"
+      },
+      "id": "5ef063c4-ca4e-4a94-a7cc-9ba904be3215",
+      "name": "Hata Kaydını Hazırla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "insert",
+        "collection": "loglar",
+        "fields": "kid,akis,dugum,hata,yurutme_id,yurutme_url,seviye,tarih",
+        "options": {
+          "dateFields": "tarih"
+        }
+      },
+      "id": "d9b9eb4d-3804-4025-a43b-c59a98b84f0a",
+      "name": "Loglara Yaz",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        480,
+        0
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $('Hata Kaydını Hazırla').first().json.tg_metin }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "f140bae8-dbb2-405c-a968-c38f97a3dfed",
+      "name": "Telegram Uyarısı",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        0
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "ofisTelegram0001",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Hata Oluştuğunda": {
+      "main": [
+        [
+          {
+            "node": "Hata Kaydını Hazırla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hata Kaydını Hazırla": {
+      "main": [
+        [
+          {
+            "node": "Loglara Yaz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loglara Yaz": {
+      "main": [
+        [
+          {
+            "node": "Telegram Uyarısı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

@@ -1,0 +1,1180 @@
+{
+  "id": "OfisAsistan06Sos",
+  "name": "06-Sosyal-Medya",
+  "description": "Her gün sıradaki konu için LinkedIn taslağı üretir, mobil uygulamadan onay bekler; onaysız yayın yapmaz, ret gelirse en fazla 3 tur yeniden yazar.",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 10 * * *"
+            }
+          ]
+        }
+      },
+      "id": "39977901-251b-4822-a0f2-b5c0d9544ec5",
+      "name": "Her Gün 10:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "api/icerik/simdi",
+        "responseMode": "onReceived",
+        "options": {
+          "responseData": "{\"durum\":\"baslatildi\"}"
+        }
+      },
+      "id": "b49c55e1-5816-4be9-a3f9-a2f27f0f60d5",
+      "name": "Elle Başlat",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "webhookId": "ab4799ef-7f1e-42f3-aeca-66272dccd672"
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "aggregate",
+        "collection": "icerikler",
+        "query": "[{\"$match\":{\"durum\":\"sirada\"}},{\"$sort\":{\"sira\":1,\"olusturma\":1}},{\"$limit\":1},{\"$project\":{\"_id\":0,\"resume_url\":0}}]"
+      },
+      "id": "cfce49e2-56aa-406b-af71-d1320d8fbd7c",
+      "name": "Sıradaki Konu",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "da7fd52a-93b1-452a-a990-e40209bb90aa",
+              "leftValue": "={{ $json.kid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "ec19baa1-db90-4960-a2b6-df000a7646a8",
+      "name": "Konu Var mı?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        460,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "ℹ️ <b>Sosyal medya</b>\nSırada bekleyen içerik konusu yok. Mobil uygulamadan yeni konu ekleyebilirsin.",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "10ee3c8a-1ef1-490e-a1c2-03da41aa6b5e",
+      "name": "Konu Kalmadı Uyarısı",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        700,
+        180
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "ofisTelegram0001",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nreturn [{ json: { kid: d.kid, konu: d.konu, platform: d.platform === 'x' ? 'x' : 'linkedin', tur: 1, onceki_metin: '', geri_bildirim: '', gecmis: Array.isArray(d.gecmis) ? d.gecmis : [] } }];"
+      },
+      "id": "99331943-0ce4-49cf-a03c-6ad633e5ec0e",
+      "name": "İlk Tur Bağlamı",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $input.first().json }];"
+      },
+      "id": "996e2913-934e-4ff5-ad29-264bae629c63",
+      "name": "Taslak Bağlamı",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Platform: {{ $json.platform }}\nKonu: {{ $json.konu }}\nTur: {{ $json.tur }} / 3\n\n{{ $json.tur > 1 ? 'Önceki taslak:\\n\"\"\"\\n' + $json.onceki_metin + '\\n\"\"\"\\nOnaylayanın geri bildirimi: ' + ($json.geri_bildirim || '(geri bildirim verilmedi; farklı bir yaklaşım dene)') + '\\n\\nBu geri bildirime göre taslağı baştan yeniden yaz.' : 'İlk taslağı yaz.' }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Sen küçük bir işletmenin sosyal medya içerik yazarısın.\n\nGörevin: Verilen konu için platforma uygun bir paylaşım taslağı hazırlamak.\n\nPlatform kuralları:\n- linkedin: Profesyonel ama samimi ton. İlk satır dikkat çekici bir cümle olsun. 600-1200 karakter, kısa paragraflar. En fazla 2 emoji.\n- x: En fazla 240 karakter, tek net mesaj.\n\nAlanlar:\n- metin: Paylaşım metni. Hashtag'leri metnin İÇİNE yazma.\n- hashtagler: 3-5 adet, Türkçe karakter içermeyen, boşluksuz, başında # olan etiket (ör. \"#yapayzeka\").\n- gorsel_istemi: Bu paylaşıma eşlik edecek görseli tarif eden 1-2 cümlelik Türkçe istem (görselin kendisi değil; sahne, stil ve renkleri anlat, görselde yazı olmasın).\n\nKesin kurallar:\n- Doğrulanamayan istatistik, rakam, alıntı, müşteri adı veya iddia uydurma.\n- Tur 2 veya 3 ise: önceki taslağı ve onaylayanın geri bildirimini dikkate alarak taslağı BAŞTAN yeniden yaz; geri bildirimdeki her isteği karşıla.\n- Yalnızca Türkçe ve Latin alfabesiyle yaz. Yanıtı yalnızca istenen JSON biçiminde ver.",
+          "maxIterations": 4,
+          "enableStreaming": false
+        }
+      },
+      "id": "3d7f9af5-e4bc-4913-a7cd-279782285ec7",
+      "name": "İçerik Yaz",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1180,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "model": "={{ $env.OLLAMA_MODEL || 'qwen2.5:7b' }}",
+        "options": {
+          "temperature": 0.7,
+          "numCtx": 8192,
+          "keepAlive": "30m"
+        }
+      },
+      "id": "e97596eb-229b-4b1d-ad73-46ec3016628e",
+      "name": "Ollama: İçerik Yaz",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        120
+      ],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ofisOllama000001",
+          "name": "Ollama (yerel)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"metin\": {\n      \"type\": \"string\",\n      \"description\": \"Paylaşım metni (hashtag içermez)\"\n    },\n    \"hashtagler\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"minItems\": 0,\n      \"maxItems\": 5\n    },\n    \"gorsel_istemi\": {\n      \"type\": \"string\",\n      \"description\": \"Görsel üretimi için Türkçe tarif\"\n    }\n  },\n  \"required\": [\n    \"metin\",\n    \"hashtagler\",\n    \"gorsel_istemi\"\n  ],\n  \"additionalProperties\": false\n}",
+        "autoFix": true
+      },
+      "id": "ecc8d52f-3c92-4e04-a005-78c12dcf414c",
+      "name": "JSON Şeması: İçerik Yaz",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1360,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Qwen modelleri bazen Türkçe harfleri GBK \"mojibake\" karakterleriyle yazar (ı -> 谋, ş -> 艧 ...).\nconst MOJIBAKE = { '莽': 'ç', '脟': 'Ç', '臒': 'ğ', '臑': 'Ğ', '谋': 'ı', '陌': 'İ', '枚': 'ö', '脰': 'Ö', '艧': 'ş', '艦': 'Ş', '眉': 'ü', '脺': 'Ü', '芒': 'â', '卯': 'î', '没': 'û' };\nconst MOJIBAKE_RE = new RegExp('[' + Object.keys(MOJIBAKE).join('') + ']', 'g');\n/** Model metnini temizler: mojibake düzeltme, ** kaldırma, boşluk sadeleştirme */\nconst duzelt = (s) =>\n  String(s ?? '')\n    .replace(MOJIBAKE_RE, (c) => MOJIBAKE[c])\n    .replace(/\\*\\*/g, '')\n    .replace(/[ \\t]+/g, ' ')\n    .trim();\n\n/** Telegram HTML ve e-posta gövdesi için kaçış */\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nconst b = $('Taslak Bağlamı').itemMatching(0).json;\nconst o = $input.first().json.output || {};\nconst sinir = b.platform === 'x' ? 280 : 3000;\n\nconst hashtagler = [\n  ...new Set(\n    (Array.isArray(o.hashtagler) ? o.hashtagler : [])\n      .map((h) => '#' + duzelt(h).replace(/^#+/, '').replace(/\\s+/g, ''))\n      .filter((h) => h.length > 2),\n  ),\n].slice(0, 5);\nlet metin = duzelt(o.metin).replace(/(^|\\s)#[\\p{L}\\p{N}_]+/gu, '$1').replace(/ {2,}/g, ' ').trim();\nconst ek = hashtagler.length ? '\\n\\n' + hashtagler.join(' ') : '';\nif (metin.length + ek.length > sinir) metin = metin.slice(0, sinir - ek.length - 1).replace(/\\s+\\S*$/, '') + '…';\nif (!metin) throw new Error('Model boş içerik üretti.');\nconst gorsel_istemi = duzelt(o.gorsel_istemi);\nconst simdi = new Date().toISOString();\n\nconst gecmis = [...(b.gecmis || []), { tur: b.tur, metin, hashtagler, tarih: simdi, karar: null, geri_bildirim: null }];\nconst tg = [\n  '📝 <b>Onay bekleyen paylaşım</b> (tur ' + b.tur + '/3, ' + b.platform + ')',\n  '<b>Konu:</b> ' + esc(b.konu),\n  '',\n  esc(metin + ek).slice(0, 3500),\n  '',\n  '👉 Mobil uygulamada <b>İçerik Onayı</b> ekranından onayla ya da geri bildirimle reddet. Onay gelmeden hiçbir şey yayınlanmaz.',\n].join('\\n');\n\nreturn [\n  {\n    json: {\n      kid: b.kid,\n      konu: b.konu,\n      platform: b.platform,\n      tur: b.tur,\n      metin,\n      hashtagler,\n      gorsel_istemi,\n      paylasim_metni: metin + ek,\n      gecmis,\n      durum: 'onay_bekliyor',\n      // Wait düğümünün sürdürme adresi; uygulamaya hiçbir zaman gönderilmez (07 projeksiyonda çıkarır)\n      resume_url: $execution.resumeUrl,\n      guncelleme: simdi,\n      tg_metin: tg,\n    },\n  },\n];"
+      },
+      "id": "cf05fc85-9182-4f2a-a966-e604c6afc274",
+      "name": "Taslağı Hazırla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "update",
+        "collection": "icerikler",
+        "updateKey": "kid",
+        "fields": "metin,hashtagler,gorsel_istemi,durum,tur,gecmis,resume_url,guncelleme",
+        "upsert": false,
+        "options": {
+          "dateFields": "guncelleme"
+        }
+      },
+      "id": "dfb5a79d-21cb-45c7-a82b-fcb11e9eb499",
+      "name": "Taslağı Onaya Sun",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        1720,
+        -100
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $('Taslağı Hazırla').item.json.tg_metin }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "0ef6b82e-314d-4e3d-a63f-c7192aec700c",
+      "name": "Onay İsteği Bildirimi",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1940,
+        -100
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "ofisTelegram0001",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "httpMethod": "POST",
+        "responseMode": "onReceived",
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": "={{ Number($env.ICERIK_ONAY_SURESI_SAAT || 24) }}",
+        "resumeUnit": "hours",
+        "options": {
+          "ipWhitelist": "127.0.0.1,::1,::ffff:127.0.0.1"
+        }
+      },
+      "id": "bbde20ff-2c16-4598-adda-5fadb56b9b51",
+      "name": "Onay Bekle",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2160,
+        -100
+      ],
+      "webhookId": "179a946c-94e4-43e3-a426-91d3c63599c1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Qwen modelleri bazen Türkçe harfleri GBK \"mojibake\" karakterleriyle yazar (ı -> 谋, ş -> 艧 ...).\nconst MOJIBAKE = { '莽': 'ç', '脟': 'Ç', '臒': 'ğ', '臑': 'Ğ', '谋': 'ı', '陌': 'İ', '枚': 'ö', '脰': 'Ö', '艧': 'ş', '艦': 'Ş', '眉': 'ü', '脺': 'Ü', '芒': 'â', '卯': 'î', '没': 'û' };\nconst MOJIBAKE_RE = new RegExp('[' + Object.keys(MOJIBAKE).join('') + ']', 'g');\n/** Model metnini temizler: mojibake düzeltme, ** kaldırma, boşluk sadeleştirme */\nconst duzelt = (s) =>\n  String(s ?? '')\n    .replace(MOJIBAKE_RE, (c) => MOJIBAKE[c])\n    .replace(/\\*\\*/g, '')\n    .replace(/[ \\t]+/g, ' ')\n    .trim();\n\nconst w = $input.first().json;\nlet t;\ntry {\n  t = $('Taslağı Hazırla').itemMatching(0).json;\n} catch (e) {\n  t = $('Taslağı Hazırla').last().json;\n}\nconst b = w && typeof w.body === 'object' ? w.body : null;\nconst yanit_geldi = !!(b && Object.prototype.hasOwnProperty.call(b, 'onay'));\n// Yalnızca boolean true onaydır; \"true\" metni, 1 vb. kabul edilmez\nconst onay = yanit_geldi && b.onay === true;\nconst geri_bildirim = yanit_geldi ? duzelt(b.geri_bildirim).slice(0, 1000) : '';\nconst simdi = new Date().toISOString();\n\nconst gecmis = (t.gecmis || []).map((g) => ({ ...g }));\nconst son = gecmis[gecmis.length - 1];\nif (son) {\n  son.karar = !yanit_geldi ? 'zaman_asimi' : onay ? 'onay' : 'ret';\n  son.geri_bildirim = geri_bildirim || null;\n  son.karar_tarihi = simdi;\n}\nconst { tg_metin, ...temiz } = t;\nreturn [{ json: { ...temiz, yanit_geldi, onay, geri_bildirim, gorsel_iste: onay && b.gorsel_iste === true, gecmis, resume_url: null, guncelleme: simdi } }];"
+      },
+      "id": "e0eb6104-cd65-44b9-a47f-c529b85818f9",
+      "name": "Kararı Oku",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2380,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "35855612-fba8-4f47-a687-5f6c1e18bd3a",
+              "leftValue": "={{ $json.yanit_geldi }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "0fef0a6a-c3f0-4982-a6a8-2466ed720ef7",
+      "name": "Yanıt Geldi mi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2600,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "41a628f6-ee9b-4c90-a688-c84d392b90e8",
+              "leftValue": "={{ $json.onay }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "2931f5c9-b00f-4a7c-a705-08c5d2495c2b",
+      "name": "Onaylandı mı?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2820,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const k = $input.first().json;\nreturn [{ json: { ...k, durum: 'onaylandi' } }];"
+      },
+      "id": "da583d45-ed39-404a-a972-5b69fdeca2de",
+      "name": "Onay Kaydı",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3040,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "update",
+        "collection": "icerikler",
+        "updateKey": "kid",
+        "fields": "durum,gecmis,resume_url,guncelleme",
+        "upsert": false,
+        "options": {
+          "dateFields": "guncelleme"
+        }
+      },
+      "id": "8bc7b449-7fb5-4eef-acdd-c8c8a0acca4b",
+      "name": "Onayı Kaydet",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        3260,
+        -360
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9e1800dd-0534-4882-a10e-4e1b8b7942f5",
+              "leftValue": "={{ $('Kararı Oku').item.json.gorsel_iste }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": false,
+        "options": {}
+      },
+      "id": "4d92e154-8542-41bd-aa82-0bb096aa180f",
+      "name": "Görsel İstendi mi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3480,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GORSEL_API_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ prompt: $('Kararı Oku').item.json.gorsel_istemi }) }}",
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "504b15fc-734c-4005-a3c5-27b04a4bff9d",
+      "name": "Görsel Üret (isteğe bağlı)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3700,
+        -480
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "post",
+        "operation": "create",
+        "authentication": "standard",
+        "postAs": "person",
+        "person": "={{ $env.LINKEDIN_PERSON }}",
+        "text": "={{ $('Kararı Oku').item.json.paylasim_metni }}",
+        "shareMediaCategory": "IMAGE",
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "visibility": "PUBLIC"
+        }
+      },
+      "id": "4d0fe593-b61a-4a99-a79e-75f63e99414a",
+      "name": "LinkedIn'de Görselli Paylaş",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [
+        3920,
+        -480
+      ],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "ofisLinkedIn0001",
+          "name": "LinkedIn"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "post",
+        "operation": "create",
+        "authentication": "standard",
+        "postAs": "person",
+        "person": "={{ $env.LINKEDIN_PERSON }}",
+        "text": "={{ $('Kararı Oku').item.json.paylasim_metni }}",
+        "shareMediaCategory": "NONE",
+        "additionalFields": {
+          "visibility": "PUBLIC"
+        }
+      },
+      "id": "9f605e81-c16c-49ab-a591-bb8946d3f89a",
+      "name": "LinkedIn'de Paylaş",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [
+        3920,
+        -280
+      ],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "ofisLinkedIn0001",
+          "name": "LinkedIn"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/** Telegram HTML ve e-posta gövdesi için kaçış */\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nconst k = $('Kararı Oku').first().json;\nconst simdi = new Date().toISOString();\nreturn [\n  {\n    json: {\n      kid: k.kid,\n      durum: 'yayinlandi',\n      yayin_id: $input.first().json.urn || '',\n      yayin_tarihi: simdi,\n      guncelleme: simdi,\n      tg_metin: '✅ <b>Paylaşım yayınlandı</b> (' + esc(k.platform) + ')\\n<b>Konu:</b> ' + esc(k.konu),\n    },\n  },\n];"
+      },
+      "id": "94feadd2-71df-41c4-a1ce-bd98a5ec15b5",
+      "name": "Yayın Sonucu",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4140,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "update",
+        "collection": "icerikler",
+        "updateKey": "kid",
+        "fields": "durum,yayin_id,yayin_tarihi,guncelleme",
+        "upsert": false,
+        "options": {
+          "dateFields": "yayin_tarihi,guncelleme"
+        }
+      },
+      "id": "eb4e0140-8ac8-4671-a57a-92677d8ca6f1",
+      "name": "Yayınlandı Olarak İşaretle",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        4360,
+        -360
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $('Yayın Sonucu').first().json.tg_metin }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "c687991f-005e-461c-ac87-bac0c175383b",
+      "name": "Yayın Bildirimi",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        4580,
+        -360
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "ofisTelegram0001",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cf483432-e4dd-4dda-a925-a74d6ad1a0a0",
+              "leftValue": "={{ $json.tur }}",
+              "rightValue": 3,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "5c2dbc17-ffdf-4f34-a7b3-c414dbc8ae72",
+      "name": "Tur Hakkı Var mı?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3040,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const k = $input.first().json;\nreturn [{ json: { kid: k.kid, konu: k.konu, platform: k.platform, tur: k.tur + 1, onceki_metin: k.metin, geri_bildirim: k.geri_bildirim, gecmis: k.gecmis } }];"
+      },
+      "id": "5f18cee8-36d8-4aba-a771-6014ce753ee4",
+      "name": "Yeniden Yazım Bağlamı",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3260,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/** Telegram HTML ve e-posta gövdesi için kaçış */\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nconst k = $input.first().json;\nreturn [\n  {\n    json: {\n      ...k,\n      durum: 'reddedildi_son',\n      tg_metin: '❌ <b>Paylaşım 3 turda da reddedildi</b>\\n<b>Konu:</b> ' + esc(k.konu) + '\\nKonu \"reddedildi_son\" olarak işaretlendi; yeniden denemek için uygulamadan tekrar sıraya ekleyebilirsin.',\n    },\n  },\n];"
+      },
+      "id": "c7f373ac-88b1-48a6-ac8f-df4ab7c07593",
+      "name": "Son Ret Kaydı",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3260,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "update",
+        "collection": "icerikler",
+        "updateKey": "kid",
+        "fields": "durum,gecmis,resume_url,guncelleme",
+        "upsert": false,
+        "options": {
+          "dateFields": "guncelleme"
+        }
+      },
+      "id": "19deb515-ae3e-49db-adec-3f34f9551f06",
+      "name": "Reddedildi Olarak İşaretle",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        3480,
+        -160
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $('Son Ret Kaydı').first().json.tg_metin }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "e66abd81-5bce-4dd6-aa2e-55f62876d72c",
+      "name": "Ret Bildirimi",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3700,
+        -160
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "ofisTelegram0001",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/** Telegram HTML ve e-posta gövdesi için kaçış */\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nconst k = $input.first().json;\nreturn [\n  {\n    json: {\n      ...k,\n      durum: 'sirada',\n      tg_metin: '⏰ <b>Onay süresi doldu</b>\\n<b>Konu:</b> ' + esc(k.konu) + '\\nTaslak yayınlanmadı; konu sıraya geri alındı, yarın yeniden denenecek.',\n    },\n  },\n];"
+      },
+      "id": "9490fe62-ab89-42ef-a110-2c94a4f03249",
+      "name": "Zaman Aşımı Kaydı",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2820,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "update",
+        "collection": "icerikler",
+        "updateKey": "kid",
+        "fields": "durum,gecmis,resume_url,guncelleme",
+        "upsert": false,
+        "options": {
+          "dateFields": "guncelleme"
+        }
+      },
+      "id": "f8d111ac-27f5-4f43-a055-501c6004f9bd",
+      "name": "Sıraya Geri Al",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        3040,
+        120
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $('Zaman Aşımı Kaydı').first().json.tg_metin }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "e56b50ad-af91-44b1-a8d7-88a5b17afea0",
+      "name": "Zaman Aşımı Bildirimi",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3260,
+        240
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "ofisTelegram0001",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Ollama: İçerik Yaz": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "İçerik Yaz",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "JSON Şeması: İçerik Yaz",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JSON Şeması: İçerik Yaz": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "İçerik Yaz",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Her Gün 10:00": {
+      "main": [
+        [
+          {
+            "node": "Sıradaki Konu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Elle Başlat": {
+      "main": [
+        [
+          {
+            "node": "Sıradaki Konu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sıradaki Konu": {
+      "main": [
+        [
+          {
+            "node": "Konu Var mı?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Konu Var mı?": {
+      "main": [
+        [
+          {
+            "node": "İlk Tur Bağlamı",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Konu Kalmadı Uyarısı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "İlk Tur Bağlamı": {
+      "main": [
+        [
+          {
+            "node": "Taslak Bağlamı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Taslak Bağlamı": {
+      "main": [
+        [
+          {
+            "node": "İçerik Yaz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "İçerik Yaz": {
+      "main": [
+        [
+          {
+            "node": "Taslağı Hazırla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Taslağı Hazırla": {
+      "main": [
+        [
+          {
+            "node": "Taslağı Onaya Sun",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Taslağı Onaya Sun": {
+      "main": [
+        [
+          {
+            "node": "Onay İsteği Bildirimi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Onay İsteği Bildirimi": {
+      "main": [
+        [
+          {
+            "node": "Onay Bekle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Onay Bekle": {
+      "main": [
+        [
+          {
+            "node": "Kararı Oku",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kararı Oku": {
+      "main": [
+        [
+          {
+            "node": "Yanıt Geldi mi?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Yanıt Geldi mi?": {
+      "main": [
+        [
+          {
+            "node": "Onaylandı mı?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Zaman Aşımı Kaydı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Onaylandı mı?": {
+      "main": [
+        [
+          {
+            "node": "Onay Kaydı",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tur Hakkı Var mı?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Onay Kaydı": {
+      "main": [
+        [
+          {
+            "node": "Onayı Kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Onayı Kaydet": {
+      "main": [
+        [
+          {
+            "node": "Görsel İstendi mi?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Görsel İstendi mi?": {
+      "main": [
+        [
+          {
+            "node": "Görsel Üret (isteğe bağlı)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "LinkedIn'de Paylaş",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Görsel Üret (isteğe bağlı)": {
+      "main": [
+        [
+          {
+            "node": "LinkedIn'de Görselli Paylaş",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn'de Görselli Paylaş": {
+      "main": [
+        [
+          {
+            "node": "Yayın Sonucu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn'de Paylaş": {
+      "main": [
+        [
+          {
+            "node": "Yayın Sonucu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Yayın Sonucu": {
+      "main": [
+        [
+          {
+            "node": "Yayınlandı Olarak İşaretle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Yayınlandı Olarak İşaretle": {
+      "main": [
+        [
+          {
+            "node": "Yayın Bildirimi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tur Hakkı Var mı?": {
+      "main": [
+        [
+          {
+            "node": "Yeniden Yazım Bağlamı",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Son Ret Kaydı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Yeniden Yazım Bağlamı": {
+      "main": [
+        [
+          {
+            "node": "Taslak Bağlamı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Son Ret Kaydı": {
+      "main": [
+        [
+          {
+            "node": "Reddedildi Olarak İşaretle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reddedildi Olarak İşaretle": {
+      "main": [
+        [
+          {
+            "node": "Ret Bildirimi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zaman Aşımı Kaydı": {
+      "main": [
+        [
+          {
+            "node": "Sıraya Geri Al",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sıraya Geri Al": {
+      "main": [
+        [
+          {
+            "node": "Zaman Aşımı Bildirimi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "OfisAsistan00Hat"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

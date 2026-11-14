@@ -1,0 +1,1158 @@
+{
+  "id": "OfisAsistan07Api",
+  "name": "07-Mobil-API",
+  "description": "Flutter mobil uygulaması için REST uç noktaları (GET listeler, içerik kararı, görev durumu, yeni konu).",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const veriler = $input\n  .all()\n  .map((i) => i.json)\n  .filter((j) => j && Object.keys(j).length);\nreturn [{ json: { status: 200, body: { veriler, adet: veriler.length } } }];"
+      },
+      "id": "ca236cb6-f9a5-47e8-a530-9d4a8fee7e9c",
+      "name": "Liste Yanıtı",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.status || 200 }}"
+        }
+      },
+      "id": "8c4cc57a-0a0b-454a-af9d-9155f755e8b8",
+      "name": "Yanıtla",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1400,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "api/panel",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c68b4562-a1b8-404e-a642-00dc4219c57a",
+      "name": "GET panel",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "bc5d2d18-4d22-4190-a4d1-4f33814f22fc"
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "aggregate",
+        "collection": "epostalar",
+        "query": "[{\"$match\":{\"acil\":true,\"$expr\":{\"$gte\":[\"$alinma\",{\"$dateSubtract\":{\"startDate\":\"$$NOW\",\"unit\":\"day\",\"amount\":7}}]}}},{\"$count\":\"n\"},{\"$set\":{\"k\":\"acil_eposta_7g\"}},{\"$unionWith\":{\"coll\":\"epostalar\",\"pipeline\":[{\"$match\":{\"$expr\":{\"$gte\":[\"$alinma\",{\"$dateSubtract\":{\"startDate\":\"$$NOW\",\"unit\":\"day\",\"amount\":1}}]}}},{\"$count\":\"n\"},{\"$set\":{\"k\":\"eposta_24s\"}}]}},{\"$unionWith\":{\"coll\":\"yorumlar\",\"pipeline\":[{\"$match\":{\"duygu\":\"olumsuz\",\"$expr\":{\"$gte\":[\"$olusturma\",{\"$dateSubtract\":{\"startDate\":\"$$NOW\",\"unit\":\"day\",\"amount\":7}}]}}},{\"$count\":\"n\"},{\"$set\":{\"k\":\"olumsuz_yorum_7g\"}}]}},{\"$unionWith\":{\"coll\":\"icerikler\",\"pipeline\":[{\"$match\":{\"durum\":\"onay_bekliyor\"}},{\"$count\":\"n\"},{\"$set\":{\"k\":\"bekleyen_onay\"}}]}},{\"$unionWith\":{\"coll\":\"icerikler\",\"pipeline\":[{\"$match\":{\"durum\":\"sirada\"}},{\"$count\":\"n\"},{\"$set\":{\"k\":\"siradaki_konu\"}}]}},{\"$unionWith\":{\"coll\":\"gorevler\",\"pipeline\":[{\"$match\":{\"durum\":\"acik\"}},{\"$count\":\"n\"},{\"$set\":{\"k\":\"acik_gorev\"}}]}},{\"$unionWith\":{\"coll\":\"gorevler\",\"pipeline\":[{\"$match\":{\"durum\":\"acik\",\"eksik_alanlar\":{\"$ne\":[]}}},{\"$count\":\"n\"},{\"$set\":{\"k\":\"eksik_gorev\"}}]}},{\"$unionWith\":{\"coll\":\"loglar\",\"pipeline\":[{\"$match\":{\"$expr\":{\"$gte\":[\"$tarih\",{\"$dateSubtract\":{\"startDate\":\"$$NOW\",\"unit\":\"day\",\"amount\":1}}]}}},{\"$count\":\"n\"},{\"$set\":{\"k\":\"hata_24s\"}}]}}]"
+      },
+      "id": "363d6453-e131-4828-a907-4b3a966781c2",
+      "name": "Panel Sayaçları",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        300,
+        0
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const sayaclar = { acil_eposta_7g: 0, eposta_24s: 0, olumsuz_yorum_7g: 0, bekleyen_onay: 0, siradaki_konu: 0, acik_gorev: 0, eksik_gorev: 0, hata_24s: 0 };\nfor (const { json } of $input.all()) if (json.k) sayaclar[json.k] = json.n;\nreturn [{ json: { status: 200, body: { sayaclar, zaman: new Date().toISOString() } } }];"
+      },
+      "id": "da26bfe5-0e50-492b-aa92-850702ee2dd5",
+      "name": "Panel Yanıtı",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "api/epostalar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "9c647bab-44ed-4fbc-a0f6-1bc682d206a8",
+      "name": "GET epostalar",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "929c5efe-4c45-42d4-aea0-df74f3ac46d3"
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "aggregate",
+        "collection": "epostalar",
+        "query": "={{ JSON.stringify([\n  { \"$match\": Object.assign({ durum: \"tamam\" },\n      [\"is\", \"fatura\", \"kisisel\", \"bulten\", \"diger\"].includes($json.query.kategori) ? { kategori: $json.query.kategori } : {},\n      $json.query.acil === \"true\" ? { acil: true } : {}) },\n  { \"$sort\": { alinma: -1 } }, { \"$skip\": Math.min(Math.max(parseInt($json.query.sayfa) || 0, 0), 1000) * 30 }, { \"$limit\": 30 },\n  { \"$project\": { _id: 0, kid: 1, gonderen: 1, konu: 1, alinma: 1, ozet: 1, kategori: 1, acil: 1, gerekce: 1, bildirim_gonderildi: 1 } }\n]) }}"
+      },
+      "id": "bd17c937-b13b-4deb-adf3-7e77a01ac23b",
+      "name": "E-posta Listesi",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        300,
+        200
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "api/yorumlar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8d8135b5-da9b-4956-a7ae-5e3eb6bd0ed7",
+      "name": "GET yorumlar",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        400
+      ],
+      "webhookId": "095146f6-e413-4763-aa3e-e8aaf403590d"
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "aggregate",
+        "collection": "yorumlar",
+        "query": "={{ JSON.stringify([\n  { \"$match\": [\"olumlu\", \"olumsuz\", \"notr\"].includes($json.query.duygu) ? { duygu: $json.query.duygu } : {} },\n  { \"$sort\": { olusturma: -1 } }, { \"$skip\": Math.min(Math.max(parseInt($json.query.sayfa) || 0, 0), 1000) * 30 }, { \"$limit\": 30 },\n  { \"$project\": { _id: 0 } }\n]) }}"
+      },
+      "id": "f1543ef4-fb9c-44b4-a08c-3440851fb968",
+      "name": "Yorum Listesi",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        300,
+        400
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "api/bultenler",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "10c1de20-0847-4640-aeb7-998ce408e710",
+      "name": "GET bultenler",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        600
+      ],
+      "webhookId": "63a47d4c-d503-4eef-a53c-e9faefb65e37"
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "aggregate",
+        "collection": "bultenler",
+        "query": "={{ JSON.stringify([\n  { \"$sort\": { olusturma: -1 } }, { \"$skip\": Math.min(Math.max(parseInt($json.query.sayfa) || 0, 0), 1000) * 30 }, { \"$limit\": 30 },\n  { \"$project\": { _id: 0, kid: 1, hafta: 1, konu_basligi: 1, giris: 1, haberler: 1, durum: 1, olusturma: 1 } }\n]) }}"
+      },
+      "id": "ed74966a-0c33-46a3-aa1e-ef1946e3765c",
+      "name": "Bülten Listesi",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        300,
+        600
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "api/gorevler",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "53993fb0-7b07-4510-a493-eeba8884b46d",
+      "name": "GET gorevler",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        800
+      ],
+      "webhookId": "c7d2fe0e-04cd-4d2f-aabc-ec9d9680f2a1"
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "aggregate",
+        "collection": "gorevler",
+        "query": "={{ JSON.stringify([\n  { \"$match\": [\"acik\", \"tamam\"].includes($json.query.durum) ? { durum: $json.query.durum } : {} },\n  { \"$sort\": { durum: 1, tarih: 1, olusturma: -1 } }, { \"$skip\": Math.min(Math.max(parseInt($json.query.sayfa) || 0, 0), 1000) * 30 }, { \"$limit\": 30 },\n  { \"$project\": { _id: 0 } }\n]) }}"
+      },
+      "id": "81c22e08-c6c3-4185-a203-bb81657a89e1",
+      "name": "Görev Listesi",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        300,
+        800
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "api/icerikler",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "9e2da85e-04e0-4935-a089-26adef3edf33",
+      "name": "GET icerikler",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1000
+      ],
+      "webhookId": "599c8371-0f16-42b0-a160-3c113e95c80c"
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "aggregate",
+        "collection": "icerikler",
+        "query": "={{ JSON.stringify([\n  { \"$match\": [\"sirada\", \"onay_bekliyor\", \"onaylandi\", \"yayinlandi\", \"reddedildi_son\"].includes($json.query.durum) ? { durum: $json.query.durum } : {} },\n  { \"$sort\": { guncelleme: -1 } }, { \"$skip\": Math.min(Math.max(parseInt($json.query.sayfa) || 0, 0), 1000) * 30 }, { \"$limit\": 30 },\n  { \"$project\": { _id: 0, resume_url: 0 } }\n]) }}"
+      },
+      "id": "23829170-6188-46a5-a0a8-8141df602ef9",
+      "name": "İçerik Listesi",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        300,
+        1000
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "api/loglar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "170b25f5-663f-4c97-ac60-4bf4530051d8",
+      "name": "GET loglar",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1200
+      ],
+      "webhookId": "9ecbaf54-d7b0-4193-a31b-dbb971340234"
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "aggregate",
+        "collection": "loglar",
+        "query": "={{ JSON.stringify([ { \"$sort\": { tarih: -1 } }, { \"$limit\": 50 }, { \"$project\": { _id: 0 } } ]) }}"
+      },
+      "id": "daef2a26-9b0a-4687-a140-c728a8dcf496",
+      "name": "Log Listesi",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        300,
+        1200
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "api/icerikler",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "bc26c527-73ae-464e-a368-675c660d9fe3",
+      "name": "POST icerikler",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1450
+      ],
+      "webhookId": "c7c2c16e-01a1-420d-aee0-208c0ae4bfd7"
+    },
+    {
+      "parameters": {
+        "jsCode": "/** Code düğümünde require gerektirmeyen UUID v4 */\nconst uuid = () =>\n  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n    const r = (Math.random() * 16) | 0;\n    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);\n  });\n\nconst b = $input.first().json.body || {};\nconst konu = String(b.konu || '').trim();\nif (konu.length < 5 || konu.length > 500) return [{ json: { ok: false, status: 400, body: { hata: 'Konu 5-500 karakter olmalı.' } } }];\nconst simdi = new Date().toISOString();\nreturn [\n  {\n    json: {\n      ok: true,\n      kid: uuid(),\n      konu,\n      platform: b.platform === 'x' ? 'x' : 'linkedin',\n      sira: Number.isFinite(Number(b.sira)) ? Number(b.sira) : Date.now(),\n      durum: 'sirada',\n      tur: 0,\n      gecmis: [],\n      olusturma: simdi,\n      guncelleme: simdi,\n    },\n  },\n];"
+      },
+      "id": "af472220-a7fc-4478-a76f-c184b7f97c4f",
+      "name": "Konuyu Doğrula",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        1450
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fee958f4-1647-4085-ac6c-ae002f2a31cc",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "e163ea00-be51-42fe-ab39-e59f958a611c",
+      "name": "Konu Geçerli mi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        460,
+        1450
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "insert",
+        "collection": "icerikler",
+        "fields": "kid,konu,platform,sira,durum,tur,gecmis,olusturma,guncelleme",
+        "options": {
+          "dateFields": "olusturma,guncelleme"
+        }
+      },
+      "id": "913a5018-e53c-4065-aaec-cb2735032cfa",
+      "name": "Konuyu Sıraya Ekle",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        700,
+        1380
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/** Respond to Webhook düğümünün beklediği biçim */\nconst yanit = (status, body) => [{ json: { status, body } }];\n\nconst k = $('Konuyu Doğrula').first().json;\nreturn yanit(201, { kid: k.kid, konu: k.konu, durum: k.durum });"
+      },
+      "id": "989a7439-6ce5-47a7-a488-3f95b28bae44",
+      "name": "Konu Yanıtı",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        1380
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "api/icerikler/karar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "9a5598ed-cbad-4757-ab8d-44636f33152e",
+      "name": "POST icerik karar",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1700
+      ],
+      "webhookId": "8cca21e4-9909-42ec-a3b2-a430da95ba39"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body || {};\nconst kid = String(b.kid || '').replace(/[^a-f0-9-]/gi, '');\nif (kid.length !== 36) return [{ json: { ok: false, status: 400, body: { hata: 'Geçersiz kid.' } } }];\nif (typeof b.onay !== 'boolean') return [{ json: { ok: false, status: 400, body: { hata: 'onay alanı true/false olmalı.' } } }];\nreturn [{ json: { ok: true, kid, onay: b.onay, geri_bildirim: String(b.geri_bildirim || '').slice(0, 1000), gorsel_iste: b.gorsel_iste === true } }];"
+      },
+      "id": "9b047cd0-9cc3-40e3-a179-640090aa5854",
+      "name": "Kararı Doğrula",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        1700
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d6cbb338-cc1b-4047-a840-7c37e55c99b3",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "7bc0ac44-cf4c-4fdc-a590-84bad43e2f90",
+      "name": "Karar Geçerli mi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        460,
+        1700
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "aggregate",
+        "collection": "icerikler",
+        "query": "={{ JSON.stringify([ { \"$match\": { kid: $json.kid, durum: \"onay_bekliyor\" } }, { \"$limit\": 1 }, { \"$project\": { _id: 0, kid: 1, resume_url: 1 } } ]) }}"
+      },
+      "id": "04eca243-579a-4df5-a4b9-dbcf2cfebff6",
+      "name": "Bekleyen Taslağı Bul",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        700,
+        1640
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst k = $('Kararı Doğrula').first().json;\nif (!d.resume_url) return [{ json: { ok: false, status: 404, body: { hata: 'Onay bekleyen taslak bulunamadı (zaten karar verilmiş veya süresi dolmuş olabilir).' } } }];\n// Wait düğümü yalnızca localhost'tan kabul eder → aynı konteynere iç adresle git\nconst url = d.resume_url.replace(/^https?:\\/\\/[^/]+/, 'http://127.0.0.1:5678');\nreturn [{ json: { ok: true, url, govde: { onay: k.onay, geri_bildirim: k.geri_bildirim, gorsel_iste: k.gorsel_iste } } }];"
+      },
+      "id": "7beccb6e-cdb0-4bd6-ae19-b514e7cbafee",
+      "name": "Sürdürme İsteği",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        1640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d0228e8c-d8c6-43e5-ae9e-7c321f298670",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "f27315d9-fa85-43e0-a931-d3f995fdee63",
+      "name": "Taslak Bulundu mu?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1160,
+        1640
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.govde) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "817d5370-a0e6-4009-a041-6ef5f8a21bf3",
+      "name": "Akışı Sürdür",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        1580
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/** Respond to Webhook düğümünün beklediği biçim */\nconst yanit = (status, body) => [{ json: { status, body } }];\n\nconst k = $('Kararı Doğrula').first().json;\nreturn yanit(200, { kid: k.kid, karar: k.onay ? 'onaylandi' : 'reddedildi', mesaj: k.onay ? 'Onaylandı, paylaşım yayınlanıyor.' : 'Reddedildi, geri bildirimle yeni taslak hazırlanacak.' });"
+      },
+      "id": "75084e00-b4c8-446a-aa49-3ed504a8fd6c",
+      "name": "Karar Yanıtı",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1620,
+        1580
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.status || 200 }}"
+        }
+      },
+      "id": "b9028b0e-e698-480f-aa3c-8086e1a124a9",
+      "name": "Karar Yanıtla",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1840,
+        1700
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "api/gorevler/durum",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "11b44bfb-a6c7-4c2e-afa6-376d2101aa3f",
+      "name": "POST gorev durum",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1950
+      ],
+      "webhookId": "7f5522e3-c08b-48bd-a849-03ac8afa3f7e"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body || {};\nconst kid = String(b.kid || '').replace(/[^a-f0-9-]/gi, '');\nif (kid.length !== 36 || !['acik', 'tamam'].includes(b.durum)) return [{ json: { ok: false, status: 400, body: { hata: 'kid ve durum (acik|tamam) gerekli.' } } }];\nreturn [{ json: { ok: true, kid, durum: b.durum, guncelleme: new Date().toISOString() } }];"
+      },
+      "id": "22da0f1d-d8c6-4098-aa7f-7f47cd9d0ba8",
+      "name": "Görev Durumunu Doğrula",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        1950
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "baf51b9a-df28-4597-aa21-f4eeb64b1337",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "2323742d-0a3e-4f2b-a998-5b8290f17424",
+      "name": "Görev İsteği Geçerli mi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        460,
+        1950
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "operation": "update",
+        "collection": "gorevler",
+        "updateKey": "kid",
+        "fields": "durum,guncelleme",
+        "upsert": false,
+        "options": {
+          "dateFields": "guncelleme"
+        }
+      },
+      "id": "f231d9d9-4b3c-4c4f-a3b5-b718cb896b90",
+      "name": "Görev Durumunu Kaydet",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.5,
+      "position": [
+        700,
+        1890
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "ofisMongoAtlas01",
+          "name": "MongoDB Atlas"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/** Respond to Webhook düğümünün beklediği biçim */\nconst yanit = (status, body) => [{ json: { status, body } }];\n\nconst k = $('Görev Durumunu Doğrula').first().json;\nreturn yanit(200, { kid: k.kid, durum: k.durum });"
+      },
+      "id": "eeaf644b-b3e3-4d22-a7ef-0a1229c32272",
+      "name": "Görev Yanıtı",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        1890
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.status || 200 }}"
+        }
+      },
+      "id": "2ba4ae0f-760f-43cd-a54d-bb852ec0d614",
+      "name": "Görev Yanıtla",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1160,
+        1950
+      ]
+    }
+  ],
+  "connections": {
+    "Liste Yanıtı": {
+      "main": [
+        [
+          {
+            "node": "Yanıtla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET panel": {
+      "main": [
+        [
+          {
+            "node": "Panel Sayaçları",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Panel Sayaçları": {
+      "main": [
+        [
+          {
+            "node": "Panel Yanıtı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Panel Yanıtı": {
+      "main": [
+        [
+          {
+            "node": "Yanıtla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET epostalar": {
+      "main": [
+        [
+          {
+            "node": "E-posta Listesi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E-posta Listesi": {
+      "main": [
+        [
+          {
+            "node": "Liste Yanıtı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET yorumlar": {
+      "main": [
+        [
+          {
+            "node": "Yorum Listesi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Yorum Listesi": {
+      "main": [
+        [
+          {
+            "node": "Liste Yanıtı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET bultenler": {
+      "main": [
+        [
+          {
+            "node": "Bülten Listesi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bülten Listesi": {
+      "main": [
+        [
+          {
+            "node": "Liste Yanıtı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET gorevler": {
+      "main": [
+        [
+          {
+            "node": "Görev Listesi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Görev Listesi": {
+      "main": [
+        [
+          {
+            "node": "Liste Yanıtı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET icerikler": {
+      "main": [
+        [
+          {
+            "node": "İçerik Listesi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "İçerik Listesi": {
+      "main": [
+        [
+          {
+            "node": "Liste Yanıtı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET loglar": {
+      "main": [
+        [
+          {
+            "node": "Log Listesi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Listesi": {
+      "main": [
+        [
+          {
+            "node": "Liste Yanıtı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST icerikler": {
+      "main": [
+        [
+          {
+            "node": "Konuyu Doğrula",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Konuyu Doğrula": {
+      "main": [
+        [
+          {
+            "node": "Konu Geçerli mi?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Konu Geçerli mi?": {
+      "main": [
+        [
+          {
+            "node": "Konuyu Sıraya Ekle",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Yanıtla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Konuyu Sıraya Ekle": {
+      "main": [
+        [
+          {
+            "node": "Konu Yanıtı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Konu Yanıtı": {
+      "main": [
+        [
+          {
+            "node": "Yanıtla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST icerik karar": {
+      "main": [
+        [
+          {
+            "node": "Kararı Doğrula",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kararı Doğrula": {
+      "main": [
+        [
+          {
+            "node": "Karar Geçerli mi?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Karar Geçerli mi?": {
+      "main": [
+        [
+          {
+            "node": "Bekleyen Taslağı Bul",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Karar Yanıtla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bekleyen Taslağı Bul": {
+      "main": [
+        [
+          {
+            "node": "Sürdürme İsteği",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sürdürme İsteği": {
+      "main": [
+        [
+          {
+            "node": "Taslak Bulundu mu?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Taslak Bulundu mu?": {
+      "main": [
+        [
+          {
+            "node": "Akışı Sürdür",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Karar Yanıtla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Akışı Sürdür": {
+      "main": [
+        [
+          {
+            "node": "Karar Yanıtı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Karar Yanıtı": {
+      "main": [
+        [
+          {
+            "node": "Karar Yanıtla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST gorev durum": {
+      "main": [
+        [
+          {
+            "node": "Görev Durumunu Doğrula",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Görev Durumunu Doğrula": {
+      "main": [
+        [
+          {
+            "node": "Görev İsteği Geçerli mi?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Görev İsteği Geçerli mi?": {
+      "main": [
+        [
+          {
+            "node": "Görev Durumunu Kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Görev Yanıtla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Görev Durumunu Kaydet": {
+      "main": [
+        [
+          {
+            "node": "Görev Yanıtı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Görev Yanıtı": {
+      "main": [
+        [
+          {
+            "node": "Görev Yanıtla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "OfisAsistan00Hat"
+  },
+  "pinData": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

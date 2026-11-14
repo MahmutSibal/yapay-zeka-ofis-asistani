@@ -1,0 +1,67 @@
+# Yapay Zekâ Ofis Asistanı — n8n + (isteğe bağlı) Ollama
+#
+# Ollama zaten bilgisayarında çalışıyorsa:   docker compose up -d
+#   (.env içinde OLLAMA_URL=http://host.docker.internal:11434)
+# Ollama'yı da bu compose ile çalıştırmak için: docker compose --profile ollama up -d
+#   (.env içinde OLLAMA_URL=http://ollama:11434)
+#
+# Veritabanı MongoDB Atlas'tadır (bulut); burada Mongo konteyneri yoktur.
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION:-latest}
+    container_name: ofis-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    env_file: .env
+    environment:
+      - GENERIC_TIMEZONE=Europe/Istanbul
+      - TZ=Europe/Istanbul
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5678/}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # Akışlar yapılandırmayı .env'den $env ile okur (Telegram chat id, alıcılar, model adı...)
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_SECURE_COOKIE=false
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=336
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n:/import:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ofis-ollama
+    profiles: ["ollama"]
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # NVIDIA GPU varsa aşağıdaki bloğun yorumunu kaldır
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  ollama-modeller:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    depends_on: [ollama]
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "sleep 5 && ollama pull ${OLLAMA_MODEL:-qwen2.5:7b} && ollama pull ${OLLAMA_EMBED_MODEL:-bge-m3}"]
+    restart: "no"
+
+volumes:
+  n8n_data:
+  ollama_data:
